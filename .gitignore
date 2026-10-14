@@ -1,0 +1,18 @@
+# Data and model files stay out of GitHub (Kaggle rules + size)
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+*.csv
+*.parquet
+
+# Secrets
+.env
+
+# Python / notebooks
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+mlruns/
+.DS_Store

@@ -1,0 +1,9 @@
+# For notebooks / training (Kaggle already has these)
+pandas
+numpy
+scikit-learn
+lightgbm
+shap
+matplotlib
+pyarrow
+mlflow
