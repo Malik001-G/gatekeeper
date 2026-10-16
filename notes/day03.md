@@ -51,6 +51,3 @@ Final: 300 trees, `max_features = 15%`, 25% samples, `min_samples_leaf = 5`, tra
 - Random forest top 6: V258, C1, C13, V257, V201, card2.
 - V258, C1 and C13 also led the single tree, so those signals are consistent, not chance.
 - The forest draws on a broader set, including TransactionAmt, card1 and addr1.
-
-## Next
-AdaBoost and gradient boosting (LightGBM): trees built one after another, each correcting the last.

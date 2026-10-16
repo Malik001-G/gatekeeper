@@ -40,6 +40,3 @@ A clear improvement, but 69% of fraud still gets through.
 
 ## Training time
 Each tree trained in ~25–30 s, so tuning on the full training set is practical for later models.
-
-## Next
-Bagging and random forest: many trees voting together to reduce overfitting.

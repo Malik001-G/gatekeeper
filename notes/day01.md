@@ -35,7 +35,3 @@ Notebook: `notebooks/01_explore_and_split.ipynb`, run on Kaggle against the IEEE
 | Replay | 153–182 | 85,430   | 3.50%      |
 
 Fraud rates are similar across splits, so later comparisons are fair.
-
-## Setup note
-Kaggle mounts competition data under `/kaggle/input/competitions/`, so the notebook
-searches for the files instead of using a fixed path.
