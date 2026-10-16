@@ -1,4 +1,4 @@
-# Day 1 — Data exploration and time-based splits
+# Data exploration and time-based splits
 
 Notebook: `notebooks/01_explore_and_split.ipynb`, run on Kaggle against the IEEE-CIS Fraud Detection data.
 

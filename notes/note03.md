@@ -1,4 +1,4 @@
-# Day 3 — Models 2 and 3: bagging and random forest
+#  Models 2 and 3: bagging and random forest
 
 Notebook: `notebooks/03_bagging_random_forest.ipynb`, trained on all 414,542 training rows
 (4 CPU cores on Kaggle). Same features, splits and scoring as the decision tree.

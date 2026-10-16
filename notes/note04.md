@@ -1,4 +1,4 @@
-# Day 4 — Models 4 and 5: AdaBoost and gradient boosting (LightGBM)
+# Models 4 and 5: AdaBoost and gradient boosting (LightGBM)
 
 Notebook: `notebooks/04_boosting.ipynb`, trained on all 414,542 training rows (4 CPU cores on Kaggle).
 Same features, splits and scoring as the earlier models.

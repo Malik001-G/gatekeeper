@@ -1,4 +1,4 @@
-# Day 2 — Model 1: decision tree
+#  Model 1: decision tree
 
 Notebook: `notebooks/02_decision_tree.ipynb`, using the train/valid splits from Day 1.
 431 features (31 text columns encoded as numbers, missing values set to -999).
