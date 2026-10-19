@@ -13,6 +13,24 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  simulator:
+    build: ./simulator
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      API_URL: http://api:8000
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      api:
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine

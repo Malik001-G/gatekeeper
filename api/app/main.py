@@ -164,12 +164,22 @@ def score(payment: Payment) -> ScoreResult:
 @app.get("/decisions/recent")
 def recent_decisions(limit: int = Query(50, ge=1, le=1000),
                      decision: Optional[Literal["allow", "suspicious"]] = None) -> list[dict]:
-    return _store().recent(limit, decision)
+    try:
+        return _store().recent(limit, decision)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Decision log unavailable: {e}")
 
 
 @app.get("/stats")
 def stats(minutes: Optional[int] = Query(None, ge=1, description="Only the last N minutes")) -> dict:
-    return _store().stats(minutes)
+    try:
+        return _store().stats(minutes)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"Decision log unavailable: {e}")
 
 
 def _num(v):
