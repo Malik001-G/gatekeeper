@@ -1,5 +1,4 @@
-# Gatekeeper — local stack. Start with: docker compose up --build
-# More services (simulator, dashboard, Caddy) are added as the schedule reaches them.
+# Gatekeeper — local stack. Start with: docker compose up --build -d
 services:
   api:
     build: ./api
@@ -10,13 +9,20 @@ services:
       - ./models:/models:ro
       - ./data:/data:ro
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
 
   postgres:
     image: postgres:16-alpine
@@ -25,6 +31,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 volumes:
   pgdata:

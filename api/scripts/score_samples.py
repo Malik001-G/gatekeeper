@@ -27,7 +27,8 @@ def to_payload(row: pd.Series) -> dict:
         if v is None or (isinstance(v, float) and math.isnan(v)):
             continue  # missing fields are simply left out
         features[k] = v.item() if hasattr(v, "item") else v
-    return {"transaction_id": str(int(row["TransactionID"])), "features": features}
+    return {"transaction_id": str(int(row["TransactionID"])), "features": features,
+            "source": "score_samples", "label": int(row["isFraud"])}
 
 
 def post(url: str, body: dict) -> dict:

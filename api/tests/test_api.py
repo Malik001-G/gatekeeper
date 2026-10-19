@@ -25,7 +25,7 @@ def client(tmp_path_factory):
     (d / "champion.json").write_text(json.dumps({"model": "LightGBM", "threshold": 0.5,
                                                  "threshold_policy": "test"}))
 
-    import app.main as main
+    import gatekeeper.api.app.main as main
     main.MODEL_DIR = str(d)
     with TestClient(main.app) as c:
         yield c
@@ -66,7 +66,7 @@ def test_bad_number_is_treated_as_missing(client):
 def test_vector_matches_prepare(client):
     """Single-payment fast path must give exactly the same inputs as the batch path."""
     import pandas as pd
-    import app.main as main
+    import gatekeeper.api.app.main as main
     champ = main.state["champion"]
     payments = [{"TransactionAmt": 120.5, "ProductCD": "H"}, {"ProductCD": None},
                 {"TransactionAmt": "abc", "ProductCD": "zzz"}, {}]
@@ -74,3 +74,9 @@ def test_vector_matches_prepare(client):
         clean = {k: (v if k == "ProductCD" else pd.to_numeric(v, errors="coerce")) for k, v in p.items()}
         batch = champ.prepare(pd.DataFrame([clean]).reindex(columns=champ.features))
         assert (champ.vector(p) == batch).all(), p
+
+
+def test_score_without_history_or_store(client):
+    r = client.post("/score", json={"features": {"TransactionAmt": 20, "card1": 1}}).json()
+    assert r["card_history"] is None and r["model_ms"] <= r["latency_ms"]
+    assert client.get("/stats").status_code == 503
