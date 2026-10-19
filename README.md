@@ -3,8 +3,8 @@
 **A fraud detection system that looks at every card payment and decides, in about a millisecond,
 whether to let it through or flag it as suspicious, and explains why.**
 
-I built this in October 2026, one evening at a time, as the capstone project for HarvardX's
-*Machine Learning and AI with Python*. A live demo is coming soon.
+I built this in October 2026, as the capstone project for HarvardX's
+*Machine Learning and AI with Python*.
 
 ---
 
