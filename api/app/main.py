@@ -11,6 +11,8 @@ from typing import Literal, Optional, Union
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from psycopg.types.json import Jsonb
+
 from .history import CardHistory, CardSignals, card_key
 from .model import Champion
 
@@ -20,6 +22,8 @@ log = logging.getLogger("gatekeeper")
 MODEL_DIR = os.environ.get("MODEL_DIR", "/models")
 REDIS_URL = os.environ.get("REDIS_URL")
 DATABASE_URL = os.environ.get("DATABASE_URL")
+# Safety rule in front of the model: amounts it was never trained on are not left to the model.
+MAX_AMOUNT = float(os.environ.get("MAX_AMOUNT", "50000"))
 
 state: dict = {"champion": None, "error": None, "history": None, "store": None}
 
@@ -42,8 +46,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Gatekeeper",
-    description="Real-time fraud scoring: allow or suspicious, with a fraud score and the card's recent history.",
-    version="0.3.0",
+    description="Real-time fraud scoring: allow or suspicious, with a fraud score, the top 3 reasons "
+                "and the card's recent history.",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -74,6 +79,15 @@ class History(BaseModel):
     new_device: Optional[bool]
 
 
+class Reason(BaseModel):
+    feature: str
+    name: str = Field(..., description="Plain-language name of the feature")
+    value: str = Field(..., description="The value this payment had")
+    effect: str = Field(..., description="raises risk or lowers risk")
+    impact: float = Field(..., description="SHAP value: how far it moved the score (log-odds)")
+    text: str
+
+
 class ScoreResult(BaseModel):
     transaction_id: Optional[str]
     decision: str = Field(..., description="allow or suspicious")
@@ -82,6 +96,11 @@ class ScoreResult(BaseModel):
     latency_ms: float = Field(..., description="Total time to decide, including card history")
     model_ms: float
     features_received: int
+    rule: Optional[str] = Field(None, description="Set when a safety rule, not the model, decided")
+    reasons: Optional[list[Reason]] = Field(
+        None, description="Top 3 features behind the decision (SHAP). Present for flagged payments, "
+                          "or for every payment with explain=all")
+    explain_ms: Optional[float] = None
     card_history: Optional[History]
 
 
@@ -116,13 +135,19 @@ def model_info() -> dict:
 
 
 @app.post("/score", response_model=ScoreResult)
-def score(payment: Payment) -> ScoreResult:
+def score(payment: Payment,
+          explain: Literal["flagged", "all", "none"] = Query(
+              "flagged", description="When to add the top 3 reasons: flagged payments only (default), "
+                                     "every payment, or never")) -> ScoreResult:
     t0 = time.perf_counter()
     champ = _champion()
     d = champ.score(payment.features)
+    rule = amount_rule(payment.features.get("TransactionAmt"))
 
     signals = None
-    if state["history"] is not None:
+    if rule:  # keep impossible amounts out of the card's history
+        signals = CardSignals(card_key=card_key(payment.features)) if state["history"] is not None else None
+    elif state["history"] is not None:
         ts = payment.event_time.timestamp() if payment.event_time else None
         try:
             signals = state["history"].observe(payment.features, ts)
@@ -130,7 +155,10 @@ def score(payment: Payment) -> ScoreResult:
             log.warning("card history unavailable: %s", e)
             signals = CardSignals(card_key=card_key(payment.features))
 
-    decision = "suspicious" if d.suspicious else "allow"
+    decision = "suspicious" if (d.suspicious or rule) else "allow"
+    reasons, explain_ms = None, None
+    if explain == "all" or (explain == "flagged" and decision == "suspicious"):
+        reasons, explain_ms = champ.explain(payment.features, suspicious=d.suspicious)
     total_ms = (time.perf_counter() - t0) * 1000
 
     if state["store"] is not None:
@@ -147,6 +175,8 @@ def score(payment: Payment) -> ScoreResult:
             "amount_vs_card_avg": signals.amount_vs_avg if signals else None,
             "new_device": signals.new_device if signals else None,
             "label": payment.label,
+            "rule": rule,
+            "reasons": Jsonb(reasons) if reasons else None,
         })
 
     return ScoreResult(
@@ -157,6 +187,9 @@ def score(payment: Payment) -> ScoreResult:
         latency_ms=round(total_ms, 2),
         model_ms=round(d.latency_ms, 2),
         features_received=len(payment.features),
+        rule=rule,
+        reasons=reasons,
+        explain_ms=round(explain_ms, 2) if explain_ms is not None else None,
         card_history=History(**signals.as_dict()) if signals else None,
     )
 
@@ -180,6 +213,18 @@ def stats(minutes: Optional[int] = Query(None, ge=1, description="Only the last 
         raise
     except Exception as e:
         raise HTTPException(503, f"Decision log unavailable: {e}")
+
+
+def amount_rule(amount) -> Optional[str]:
+    """Flag amounts outside what the model can judge: missing ones are left to the model."""
+    a = _num(amount)
+    if a is None:
+        return None
+    if a <= 0:
+        return "amount must be positive"
+    if a > MAX_AMOUNT:
+        return f"amount above ${MAX_AMOUNT:,.0f}: outside the range the model was trained on"
+    return None
 
 
 def _num(v):

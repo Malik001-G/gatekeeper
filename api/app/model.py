@@ -14,6 +14,8 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
+from .reasons import top_reasons
+
 MODEL_FILE = "lightgbm_model.txt"
 PREPROCESS_FILE = "preprocess.json"
 CHAMPION_FILE = "champion.json"
@@ -85,6 +87,13 @@ class Champion:
         p = float(self.booster.predict(self.vector(features), num_threads=1)[0])
         return Decision(fraud_score=p, suspicious=p >= self.threshold,
                         latency_ms=(time.perf_counter() - t0) * 1000)
+
+    def explain(self, features: dict, suspicious: bool, k: int = 3) -> tuple[list[dict], float]:
+        """Top k reasons for the decision (SHAP values computed by LightGBM), and the time taken."""
+        t0 = time.perf_counter()
+        contrib = self.booster.predict(self.vector(features), pred_contrib=True, num_threads=1)[0]
+        reasons = top_reasons(contrib[:-1], self.features, features, suspicious, k)  # last = base value
+        return reasons, (time.perf_counter() - t0) * 1000
 
     def summary(self) -> dict:
         return {

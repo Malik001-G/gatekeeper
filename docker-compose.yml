@@ -32,6 +32,17 @@ services:
       api:
         condition: service_healthy
 
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+      SIM_URL: http://simulator:8001
+    depends_on:
+      api:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     ports:

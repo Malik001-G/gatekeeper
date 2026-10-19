@@ -5,6 +5,8 @@ Usage (inside the api container):
     python scripts/score_samples.py --n 50 --fraud 10     # include 10 known frauds
     python scripts/score_samples.py --n 1 --show-json      # print one request body
     python scripts/score_samples.py --n 2000 --fraud 1000 --quiet   # summary only
+    python scripts/score_samples.py --n 10 --fraud 5 --reasons      # show the top reasons
+    python scripts/score_samples.py --n 200 --explain all --quiet   # time the reasons on every payment
 """
 from __future__ import annotations
 
@@ -46,6 +48,9 @@ def main():
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--show-json", action="store_true", help="print the first request body")
     ap.add_argument("--quiet", action="store_true", help="print only the summary")
+    ap.add_argument("--explain", choices=["flagged", "all", "none"], default="flagged",
+                    help="when the API should add the top 3 reasons (default: flagged payments)")
+    ap.add_argument("--reasons", action="store_true", help="print the top reasons under each payment")
     args = ap.parse_args()
 
     df = pd.read_parquet(args.data)
@@ -53,26 +58,31 @@ def main():
     rest = df[df["isFraud"] == 0].sample(args.n - len(frauds), random_state=args.seed)
     batch = pd.concat([frauds, rest]).sample(frac=1, random_state=args.seed)
 
-    rows, correct, caught, false_alarms, lat = [], 0, 0, 0, []
+    rows, correct, caught, false_alarms, lat, explain = [], 0, 0, 0, [], []
     for _, row in batch.iterrows():
         body = to_payload(row)
         if args.show_json and not rows:
             print(json.dumps(body, indent=2)[:3000], "\n")
-        res = post(f"{args.url}/score", body)
+        res = post(f"{args.url}/score?explain={args.explain}", body)
         truth = "fraud" if row["isFraud"] == 1 else "genuine"
         right = (res["decision"] == "suspicious") == (truth == "fraud")
         correct += right
         caught += (truth == "fraud") and res["decision"] == "suspicious"
         false_alarms += (truth == "genuine") and res["decision"] == "suspicious"
         lat.append(res["latency_ms"])
+        if res.get("explain_ms") is not None:
+            explain.append(res["explain_ms"])
         rows.append((body["transaction_id"], f"${row['TransactionAmt']:.2f}", res["decision"],
-                     f"{res['fraud_score']:.3f}", truth, "✓" if right else "✗", f"{res['latency_ms']:.1f}"))
+                     f"{res['fraud_score']:.3f}", truth, "✓" if right else "✗", f"{res['latency_ms']:.1f}",
+                     "; ".join(r["text"] for r in res.get("reasons") or []) if args.reasons else ""))
 
     if not args.quiet:
         header = ("transaction", "amount", "decision", "score", "truth", "", "ms")
         widths = [max(len(str(r[i])) for r in rows + [header]) for i in range(len(header))]
-        for r in [header] + rows:
+        for r in [header + ("",)] + rows:
             print("  ".join(str(v).ljust(w) for v, w in zip(r, widths)))
+            if r[-1]:
+                print("    why:", r[-1])
         print()
     n_fraud, n_genuine = len(frauds), len(rows) - len(frauds)
     print(f"{correct}/{len(rows)} decisions matched the truth")
@@ -82,6 +92,10 @@ def main():
         print(f"Genuine wrongly flagged: {false_alarms}/{n_genuine} ({false_alarms / n_genuine:.2%})")
     lat = sorted(lat)
     print(f"Decision time: median {lat[len(lat) // 2]:.2f} ms, max {lat[-1]:.2f} ms")
+    if explain:
+        explain = sorted(explain)
+        print(f"Reasons (SHAP) for {len(explain)} payments: median {explain[len(explain) // 2]:.1f} ms, "
+              f"max {explain[-1]:.1f} ms")
 
 
 if __name__ == "__main__":

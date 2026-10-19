@@ -36,12 +36,14 @@ CREATE TABLE IF NOT EXISTS decisions (
     new_device          BOOLEAN,
     label               SMALLINT
 );
+ALTER TABLE decisions ADD COLUMN IF NOT EXISTS rule TEXT;
+ALTER TABLE decisions ADD COLUMN IF NOT EXISTS reasons JSONB;
 CREATE INDEX IF NOT EXISTS decisions_created_at ON decisions (created_at);
 """
 
 COLUMNS = ["event_time", "transaction_id", "source", "amount", "product", "card_key", "fraud_score",
            "decision", "threshold", "latency_ms", "card_tx_last_hour", "card_avg_amount",
-           "amount_vs_card_avg", "new_device", "label"]
+           "amount_vs_card_avg", "new_device", "label", "rule", "reasons"]
 INSERT = f"INSERT INTO decisions ({', '.join(COLUMNS)}) VALUES ({', '.join(['%s'] * len(COLUMNS))})"
 
 

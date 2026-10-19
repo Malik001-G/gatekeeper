@@ -5,7 +5,7 @@ import time
 import fakeredis
 import pytest
 
-from gatekeeper.api.app.history import CardHistory, card_key
+from app.history import CardHistory, card_key
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def test_seen_device_is_not_new(history):
 
 @pytest.mark.skipif(not os.environ.get("TEST_DATABASE_URL"), reason="needs TEST_DATABASE_URL")
 def test_decision_store_roundtrip():
-    from gatekeeper.api.app.store import DecisionStore
+    from app.store import DecisionStore
     store = DecisionStore(os.environ["TEST_DATABASE_URL"])
     for _ in range(50):
         if store.ready:
